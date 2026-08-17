@@ -56,3 +56,14 @@ test_that("status reports the environment and use_env guards a live session", {
   expect_true(nzchar(st$nolimits_version))
   expect_error(nl_use_env("elsewhere"), "already running")
 })
+
+test_that("nl_attach exposes functions without the nl$ prefix", {
+  skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
+  suppressMessages(nl_attach())
+  on.exit(nl_detach(), add = TRUE)
+  expect_true("NoLimitsR:api" %in% search())
+  expect_true(is.function(get("fit_model", pos = "NoLimitsR:api")))
+  expect_false("predict" %in% ls("NoLimitsR:api"))
+  nl_detach()
+  expect_false("NoLimitsR:api" %in% search())
+})

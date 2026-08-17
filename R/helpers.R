@@ -1,3 +1,39 @@
+#' Attach every NoLimits function to the search path so they can be called
+#' without the nl$ prefix, e.g. fit_model(dm, Laplace()). By default, names
+#' that would mask a function already visible on the search path (such as
+#' stats::predict) are skipped and reported; reach those via nl$ as before.
+#' Set exclude_masking = FALSE to attach everything anyway. Undo: nl_detach().
+nl_attach <- function(exclude_masking = TRUE) {
+  nl <- nolimits()
+  nl_detach()
+  nms <- ls(nl)
+  skipped <- character()
+  if (exclude_masking) {
+    on_search <- function(n) {
+      any(vapply(search(), function(db) {
+        exists(n, where = db, mode = "function", inherits = FALSE)
+      }, logical(1)))
+    }
+    skipped <- nms[vapply(nms, on_search, logical(1))]
+    nms <- setdiff(nms, skipped)
+  }
+  # attach() is deliberate: an explicit, user-invoked, reversible convenience.
+  attach(mget(nms, envir = nl), name = "NoLimitsR:api", warn.conflicts = FALSE)
+  if (length(skipped) > 0) {
+    message("Not attached (would mask existing R functions; use nl$ for these): ",
+            paste(skipped, collapse = ", "))
+  }
+  invisible(nms)
+}
+
+#' Remove the functions attached by nl_attach() from the search path.
+nl_detach <- function() {
+  if ("NoLimitsR:api" %in% search()) {
+    detach("NoLimitsR:api", character.only = TRUE)
+  }
+  invisible(NULL)
+}
+
 #' Evaluate Julia code (multiple expressions allowed) in the session module.
 #' Objects defined here (chains, helpers) are visible to later nl_model() calls.
 #' Note: JuliaConnectoR::juliaEval evaluates in Main instead and is NOT visible

@@ -30,6 +30,21 @@ NoLimitsR::install_nolimits(extras = c("SimpleChains", "Lux", "CSV", "JLD2"))
 
 Julia boots lazily on the first `nolimits()` call, not at `library()` time.
 
+## Prefix-free usage
+
+`nl_attach()` puts every NoLimits function on the search path, so plain calls work:
+
+```r
+nl_attach()
+res <- fit_model(dm, Laplace(), pooled_init = TRUE)
+nl_detach()
+```
+
+Names that would mask an existing R function (for example `stats::predict`) are
+skipped and reported; call those through `nl$predict(...)` as usual, or attach
+them anyway with `nl_attach(exclude_masking = FALSE)`. The `nl$` form remains
+fully supported and autocompletes all functions in RStudio.
+
 ## Environments
 
 By default everything lives in the shared Julia environment named `NoLimitsR`, so
