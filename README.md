@@ -210,14 +210,31 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   `show_trace` or progress logs, streams to the R console automatically. In Jupyter or
   the VS Code Interactive Window, raw Julia output may appear in the terminal running
   the kernel instead of in the cell.
+- Wide tables are the expensive case for `nl_collect()`: its cost tracks the number of
+  columns, not the number of rows, at a few milliseconds per column. Measured on one
+  machine, 500,000 rows by 5 columns collects in about 1.4 s, while 50 rows by 1000
+  columns takes about 4.9 s. Reshape a wide result table (one column per parameter,
+  subject, or simulation draw) to long form in Julia before collecting it.
 - Plotting: `nl_plot("plot_fits", res, file = "fits.png")` calls any NoLimits `plot_*`
   function and forwards `save_path`. Without `file` it writes a temporary PNG and draws
   it in the active graphics device in interactive sessions. CairoMakie is loaded on the
   first plot call only.
-- Model, DataModel, and fit-result objects are live references into the Julia session
-  and do not survive the process. Persist fits with `save_fit`/`load_fit` after
-  `install_nolimits(extras = "JLD2")`. A reloaded fit needs its model string
-  re-evaluated, because models themselves are not serializable.
+- Plot memory: Makie leaves figure memory behind on every plot call, about 30 MB per
+  plot in the Julia process. `nl_plot()` runs a Julia garbage collection after saving,
+  which recovers most of it (about 5 MB per plot remains in a measured 10-plot loop).
+  A very long plotting loop still grows; restart Julia between batches if it matters.
+- Object lifetime: Model, DataModel, and fit-result objects are live references into
+  the Julia session and do not survive the process. `save.image()`, a restored
+  `.RData`, and `saveRDS()`/`readRDS()` all store the reference rather than the data:
+  the object reappears in the new session and then fails on first use with a raw
+  "Object reference ... could not be resolved" error from the bridge. Persist fits with
+  `save_fit`/`load_fit` after `install_nolimits(extras = "JLD2")`. A reloaded fit needs
+  its model string re-evaluated, because models themselves are not serializable. For a
+  readable record of an object, save the text of `nl_string(x)`; it is also the
+  cleanest way to inspect one, since plain `print(x)` prepends the full Julia type
+  signature. Objects such as `get_random_effects(res)` that hold one table per random
+  effect are collected per field, as in `nl_collect(re$eta)`; `nl_collect(re)` unwraps
+  a single field for you and errors, listing the field names, when there are several.
 
 ## License
 
