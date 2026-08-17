@@ -67,6 +67,15 @@ nl_collect <- function(x) {
   as.data.frame(cols, stringsAsFactors = FALSE)
 }
 
+#' Build a Julia NamedTuple from named arguments, for NamedTuple-typed options
+#' such as Laplace(optim_kwargs = nl_nt(show_trace = TRUE)) or
+#' fit_model(..., theta_0_untransformed = nl_nt(k = 0.7)). Nests naturally:
+#' nl_nt(a = nl_nt(b = 1)).
+nl_nt <- function(...) {
+  nolimits()
+  JuliaConnectoR::juliaCall("NoLimitsSession.nl_nt", ...)
+}
+
 #' Julia Symbol from a string, for Symbol-typed arguments such as primary_id.
 jl_sym <- function(s) {
   nolimits()

@@ -45,6 +45,17 @@ skipped and reported; call those through `nl$predict(...)` as usual, or attach
 them anyway with `nl_attach(exclude_masking = FALSE)`. The `nl$` form remains
 fully supported and autocompletes all functions in RStudio.
 
+## NamedTuple options
+
+Options that are NamedTuples in Julia are built with `nl_nt()`:
+
+```r
+res <- nl$fit_model(dm, nl$Laplace(optim_kwargs = nl_nt(show_trace = TRUE)),
+                    theta_0_untransformed = nl_nt(k = 0.7))
+```
+
+`nl_nt` nests naturally, e.g. `nl_nt(a = nl_nt(b = 1))`.
+
 ## Environments
 
 By default everything lives in the shared Julia environment named `NoLimitsR`, so

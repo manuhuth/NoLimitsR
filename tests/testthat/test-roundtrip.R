@@ -67,3 +67,12 @@ test_that("nl_attach exposes functions without the nl$ prefix", {
   nl_detach()
   expect_false("NoLimitsR:api" %in% search())
 })
+
+test_that("nl_nt builds Julia NamedTuples for option kwargs", {
+  skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
+  nl <- nolimits()
+  lap <- nl$Laplace(optim_kwargs = nl_nt(show_trace = TRUE))
+  expect_match(JuliaConnectoR::juliaCall("string", lap), "show_trace")
+  nested <- nl_nt(a = nl_nt(b = 1))
+  expect_match(JuliaConnectoR::juliaCall("string", nested), "b = 1")
+})
