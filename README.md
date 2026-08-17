@@ -176,13 +176,32 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   Julia macros are not part of the dynamic surface, which is what `nl_model` and
   `nl_eval` are for.
 - Symbols: use `jl_sym("ID")` for Symbol-typed arguments such as `primary_id` and
-  `time_col`. All other keyword arguments pass through as normal R named arguments.
+  `time_col`. It takes a single string shorter than 10000 bytes, which is where R's own
+  limit on symbol names sits. All other keyword arguments pass through as normal R
+  named arguments.
 - Getting data in and out: `nl_data(df)` turns an R data.frame into a Julia
   `DataFrame`, which is what `DataModel` expects, and `nl_collect(x)` turns a Julia
   table such as a `predict` result back into an R data.frame. Scalars convert
-  automatically. `nl_string(x)` prints any Julia object the way Julia would, which is
-  the quickest look at parameters, shrinkage, or a fit summary, and `nl_get(x)` pulls a
-  non-table Julia value into plain R lists and vectors.
+  automatically. Column names round-trip unchanged, and Julia `missing` becomes `NA`.
+  `nl_string(x)` prints any Julia object the way Julia would, which is the quickest
+  look at parameters, shrinkage, or a fit summary, and `nl_get(x)` pulls a non-table
+  Julia value into plain R lists and vectors.
+- Conversion caveats:
+  - Always go through `nl_data()`. The bridge sends a factor column as its bare
+    integer codes, so `nl_data()` converts factors to their character labels first.
+    A raw data.frame handed straight to a Julia function skips that step and silently
+    substitutes codes for labels, which is easy to miss on a subject-ID column. Convert
+    with `as.character()` yourself if you bypass `nl_data()`.
+  - Duplicate column names are renamed. DataFrames.jl requires unique names, so two
+    columns called `x` arrive as `x` and `x_2` without a warning.
+  - List-columns are stringified. A column holding vectors comes back as text such as
+    `[1, 2]`, because a Julia column of exotic element type has no atomic R
+    equivalent. Split such columns into plain columns before converting.
+  - Zero-row frames are rejected: the bridge cannot serialize zero-length columns, so
+    `nl_data()` stops with a message instead.
+- NamedTuple options: `nl_nt()` builds the NamedTuple that options such as
+  `optim_kwargs` expect. Options that NoLimits keys by value rather than by name, such
+  as `constants_re`, are Julia dictionaries instead and are built with `nl_eval()`.
 - R only: use `nl_eval(code)` for Julia code that model strings must see. It evaluates
   in the session module, possibly several expressions at once, so anything it defines
   is visible to later `nl_model` calls. Evaluating in Julia's `Main` instead, which is
