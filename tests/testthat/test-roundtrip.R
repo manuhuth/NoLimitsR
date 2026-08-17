@@ -76,3 +76,11 @@ test_that("nl_nt builds Julia NamedTuples for option kwargs", {
   nested <- nl_nt(a = nl_nt(b = 1))
   expect_match(JuliaConnectoR::juliaCall("string", nested), "b = 1")
 })
+
+test_that("nl_string and nl_get avoid raw bridge calls", {
+  skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
+  s <- nl_string(jl_sym("abc"))
+  expect_type(s, "character")
+  expect_match(s, "abc")
+  expect_true(1 %in% unlist(nl_get(nl_nt(a = 1))))
+})

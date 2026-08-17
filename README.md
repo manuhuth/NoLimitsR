@@ -175,11 +175,17 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
 - Getting data in and out: `nl_data(df)` turns an R data.frame into a Julia
   `DataFrame`, which is what `DataModel` expects, and `nl_collect(x)` turns a Julia
   table such as a `predict` result back into an R data.frame. Scalars convert
-  automatically.
+  automatically. `nl_string(x)` prints any Julia object the way Julia would, which is
+  the quickest look at parameters, shrinkage, or a fit summary, and `nl_get(x)` pulls a
+  non-table Julia value into plain R lists and vectors.
 - R only: use `nl_eval(code)` for Julia code that model strings must see. It evaluates
   in the session module, possibly several expressions at once, so anything it defines
-  is visible to later `nl_model` calls. `JuliaConnectoR::juliaEval` evaluates in `Main`
-  instead and is not visible to model strings.
+  is visible to later `nl_model` calls. Evaluating in Julia's `Main` instead, which is
+  what the underlying bridge does by default, is not visible to model strings.
+- Julia console output, for example optimizer traces from `optim_kwargs` with
+  `show_trace` or progress logs, streams to the R console automatically. In Jupyter or
+  the VS Code Interactive Window, raw Julia output may appear in the terminal running
+  the kernel instead of in the cell.
 - Plotting: `nl_plot("plot_fits", res, file = "fits.png")` calls any NoLimits `plot_*`
   function and forwards `save_path`. Without `file` it writes a temporary PNG and draws
   it in the active graphics device in interactive sessions. CairoMakie is loaded on the

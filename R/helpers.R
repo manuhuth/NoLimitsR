@@ -67,6 +67,20 @@ nl_collect <- function(x) {
   as.data.frame(cols, stringsAsFactors = FALSE)
 }
 
+#' Render any Julia object (parameters, shrinkage, fit summaries) as a string,
+#' the way Julia would print it.
+nl_string <- function(x) {
+  nolimits()
+  JuliaConnectoR::juliaCall("string", x)
+}
+
+#' Materialize a Julia value into plain R data structures (lists, vectors). For
+#' tables prefer nl_collect(), which returns a data.frame.
+nl_get <- function(x) {
+  nolimits()
+  JuliaConnectoR::juliaGet(x)
+}
+
 #' Build a Julia NamedTuple from named arguments, for NamedTuple-typed options
 #' such as Laplace(optim_kwargs = nl_nt(show_trace = TRUE)) or
 #' fit_model(..., theta_0_untransformed = nl_nt(k = 0.7)). Nests naturally:
