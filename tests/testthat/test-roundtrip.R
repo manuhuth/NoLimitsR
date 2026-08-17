@@ -49,3 +49,10 @@ test_that("nl_eval evaluates in the session module", {
   skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
   expect_equal(nl_eval("1 + 1"), 2L)
 })
+
+test_that("status reports the environment and use_env guards a live session", {
+  skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
+  st <- nolimits_status()
+  expect_true(nzchar(st$nolimits_version))
+  expect_error(nl_use_env("elsewhere"), "already running")
+})

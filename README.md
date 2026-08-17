@@ -30,6 +30,32 @@ NoLimitsR::install_nolimits(extras = c("SimpleChains", "Lux", "CSV", "JLD2"))
 
 Julia boots lazily on the first `nolimits()` call, not at `library()` time.
 
+## Environments
+
+By default everything lives in the shared Julia environment named `NoLimitsR`, so
+all R sessions on the machine use the same NoLimits.jl version. A per-project
+environment takes one extra call, where `env` is either a shared environment name
+or a directory path, a path being anything that contains a `/`:
+
+```r
+NoLimitsR::install_nolimits(env = "myproject")   # once, creates the environment
+nl_use_env("myproject")                          # before the first nolimits() call
+```
+
+`nolimits_status()` is the first thing to run when something looks wrong. It
+reports whether a suitable Julia was found, the target and active environment, the
+Julia and NoLimits.jl versions, and the packages installed in the environment.
+
+`update_nolimits()` runs `Pkg.update()` on the target environment, or on the one
+given by `update_nolimits(env = ...)`. If Julia is already running, the updated
+versions take effect in the next session, because loaded Julia code is never
+replaced in place.
+
+The environment is a boot-time choice for the same reason: Julia cannot unload a
+package. Call `nl_use_env()` before the first `nolimits()` call, or use
+`nl_use_env(env, restart = TRUE)` to stop the running Julia process and switch,
+which discards all existing Julia objects (models, data, fits).
+
 ## Quickstart
 
 ```r
