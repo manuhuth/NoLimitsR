@@ -54,7 +54,10 @@ res <- nl$fit_model(dm, nl$Laplace(optim_kwargs = nl_nt(show_trace = TRUE)),
                     theta_0_untransformed = nl_nt(k = 0.7))
 ```
 
-`nl_nt` nests naturally, e.g. `nl_nt(a = nl_nt(b = 1))`.
+`nl_nt` nests naturally, e.g. `nl_nt(a = nl_nt(b = 1))`. A plain named `list()`
+works too, including nested ones, and an element without a name is rejected with a
+message pointing at `nl_nt()`. A fully unnamed `list(1, 2)` reaches Julia as an
+ordinary vector, so it is not detected as a mistyped option.
 
 ## Environments
 
@@ -72,6 +75,11 @@ Pre-release versions can be tracked with `install_nolimits(rev = "main")`, which
 installs NoLimits.jl straight from that branch, tag or commit instead of the
 registry. A plain `install_nolimits()` returns the environment to registry
 releases. When Julia is already running, both take effect at the next R session.
+
+`nolimits()` refuses to start when NoLimits.jl is not a recorded dependency of the
+target environment, because `using NoLimits` would otherwise succeed from Julia's
+stacked default environment, which pins nothing. The error names the
+`install_nolimits(env = ...)` call that fixes it.
 
 `nolimits_status()` is the first thing to run when something looks wrong. It
 reports whether a suitable Julia was found, the target and active environment, the
@@ -176,8 +184,8 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   Julia macros are not part of the dynamic surface, which is what `nl_model` and
   `nl_eval` are for.
 - Symbols: use `jl_sym("ID")` for Symbol-typed arguments such as `primary_id` and
-  `time_col`. It takes a single string shorter than 10000 bytes, which is where R's own
-  limit on symbol names sits. All other keyword arguments pass through as normal R
+  `time_col`. It takes a single non-empty string shorter than 10000 bytes, which is where
+  R's own limit on symbol names sits; `NA` and `""` are rejected. All other keyword arguments pass through as normal R
   named arguments.
 - Getting data in and out: `nl_data(df)` turns an R data.frame into a Julia
   `DataFrame`, which is what `DataModel` expects, and `nl_collect(x)` turns a Julia
@@ -199,9 +207,21 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
     equivalent. Split such columns into plain columns before converting.
   - Zero-row frames are rejected: the bridge cannot serialize zero-length columns, so
     `nl_data()` stops with a message instead.
+  - A column whose values are all `NA` carries no type across the bridge. `nl_data()`
+    names the character and factor columns so those come back as character `NA`
+    whatever the row count; an all-`NA` column of any other type comes back numeric.
 - NamedTuple options: `nl_nt()` builds the NamedTuple that options such as
   `optim_kwargs` expect. Options that NoLimits keys by value rather than by name, such
   as `constants_re`, are Julia dictionaries instead and are built with `nl_eval()`.
+- Model strings: a `@Model` block is recognized when `@Model` opens a line, so a
+  mention of it inside a comment or a string literal does not stop the body from being
+  wrapped in `@Model begin ... end`.
+- Julia errors arrive as the message Julia itself would print, without the Julia stack
+  trace: the bridge reports a trace from a task whose world age predates the session,
+  which both triggers a Julia 1.12 world-age warning and, for some plotting errors, used
+  to hang R. A named helper function defined through `nl_eval()` and then called from R
+  still prints that warning when it raises; define such helpers as anonymous functions
+  (`f <- nl_eval("(x) -> ...")`) to avoid it.
 - R only: use `nl_eval(code)` for Julia code that model strings must see. It evaluates
   in the session module, possibly several expressions at once, so anything it defines
   is visible to later `nl_model` calls. Evaluating in Julia's `Main` instead, which is
