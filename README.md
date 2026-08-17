@@ -1,5 +1,7 @@
 # NoLimitsR
 
+[![CI](https://github.com/manuhuth/NoLimitsR/actions/workflows/ci.yml/badge.svg)](https://github.com/manuhuth/NoLimitsR/actions/workflows/ci.yml)
+
 R interface to [NoLimits.jl](https://github.com/manuhuth/NoLimits.jl), a Julia
 package for nonlinear mixed-effects analysis of longitudinal data.
 
@@ -11,11 +13,11 @@ updated.
 ## Installation
 
 Install Julia 1.10 or newer, for example with [juliaup](https://github.com/JuliaLang/juliaup),
-then install the R package and the Julia dependencies:
+then install the R package from GitHub and the Julia dependencies:
 
 ```r
-install.packages("JuliaConnectoR")
-# install NoLimitsR from source, e.g. R CMD INSTALL NoLimitsR
+install.packages("remotes")
+remotes::install_github("manuhuth/NoLimitsR")
 
 NoLimitsR::install_nolimits()
 ```
@@ -256,6 +258,23 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   effect are collected per field, as in `nl_collect(re$eta)`; `nl_collect(re)` unwraps
   a single field for you and errors, listing the field names, when there are several.
 
+## Examples
+
+`examples/theophylline.R` is a runnable population-PK script: a one-compartment
+oral-absorption ODE model on the Theophylline data, fitted with warm-started
+Laplace, with fit and diagnostic plots written to PNG.
+
+```bash
+Rscript examples/theophylline.R
+```
+
+## Related
+
+- [NoLimits.jl](https://github.com/manuhuth/NoLimits.jl), the Julia package this
+  wrapper exposes.
+- [NoLimitsPy](https://github.com/manuhuth/NoLimitsPy), the sibling Python
+  interface.
+
 ## License
 
-MIT
+MIT, see [LICENSE.md](LICENSE.md).

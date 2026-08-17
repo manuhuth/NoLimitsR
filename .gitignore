@@ -1,0 +1,5 @@
+.Rhistory
+.Rproj.user/
+*.Rcheck/
+.DS_Store
+*.png
