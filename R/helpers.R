@@ -46,6 +46,10 @@ nl_eval <- function(code) {
 #' prelude before @Model (e.g. `using SimpleChains` and chain definitions). A bare
 #' block body without @Model is wrapped in @Model begin ... end.
 nl_model <- function(code) {
+  if (!is.character(code) || length(code) != 1L) {
+    stop("nl_model() needs a single string, got ", class(code)[1], " of length ",
+         length(code), ".", call. = FALSE)
+  }
   code <- trimws(code)
   if (!grepl("@Model", .strip_comments(code), fixed = TRUE)) {
     code <- paste0("@Model begin\n", code, "\nend")
@@ -135,7 +139,13 @@ nl_plot <- function(fname, ..., file = NULL) {
   if (!grepl("^(/|[A-Za-z]:)", path)) {
     path <- file.path(getwd(), path)
   }
-  do.call(nl[[fname]], c(list(...), list(save_path = path)))
+  nl[[fname]]  # errors clearly for an unknown plot name
+  # Routed through the session's nl_safe_call: a raw Julia plotting error can hang
+  # the bridge while it is being reported (see nl_safe_call).
+  do.call(.session_fun("nl_safe_call"), c(list(fname), list(...), list(save_path = path)))
+  # Makie leaves ~30 MB of figure memory per plot behind; a collect here recovers
+  # most of it (measured ~5 MB/plot residual) and costs little next to rendering.
+  nl_eval("GC.gc(); nothing")
   if (is.null(file) && interactive() && requireNamespace("png", quietly = TRUE)) {
     grid::grid.newpage()
     grid::grid.raster(png::readPNG(path))

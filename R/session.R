@@ -16,6 +16,13 @@ const Tables = DataFrames.Tables
 # then measures with length() (a 2-character string looks like 2 rows).
 nl_vec(v) = v isa AbstractVector ? v : [v]
 nl_df(tbl::DataFrames.DataFrame) = tbl
+# Accessors such as get_random_effects return a NamedTuple of DataFrames, which
+# Tables.columns would happily read as a one-row table of stringified vectors.
+function nl_df(tbl::NamedTuple{<:Any, <:Tuple{DataFrames.DataFrame, Vararg{DataFrames.DataFrame}}})
+    length(tbl) == 1 && return only(tbl)
+    error("got a NamedTuple of $(length(tbl)) tables (fields: $(join(keys(tbl), ", "))); " *
+          raw"collect one field, e.g. x$eta (R) / x.eta (Python)")
+end
 function nl_df(tbl)
     cols = Tables.columns(tbl)
     DataFrames.DataFrame([string(n) => nl_vec(Tables.getcolumn(cols, n))
@@ -28,6 +35,26 @@ nl_col(v) = eltype(v) <: Union{Real, AbstractString, Missing, Nothing} ? v : str
 nl_table(x) = (df = nl_df(x); (; (Symbol(n) => nl_col(df[!, n]) for n in Base.names(df))...))
 nl_eval_string(s::AbstractString) = Base.include_string(NoLimitsSession, s)
 nl_nt(; kwargs...) = (; kwargs...)
+# Some Julia errors (a Makie font failure, whose showerror hits a Julia 1.12
+# world-age fault of its own) corrupt the JuliaConnectoR socket while being
+# reported, and R then hangs forever. Stringify here and rethrow a plain
+# ErrorException so only a simple error ever crosses the bridge.
+function nl_safe_call(fname::AbstractString, args...; kwargs...)
+    try
+        return getfield(NoLimits, Symbol(fname))(args...; kwargs...)
+    catch e
+        msg = try
+            sprint(showerror, e)
+        catch
+            try
+                string(e)
+            catch
+                string(typeof(e))
+            end
+        end
+        error(first(msg, 2000))
+    end
+end
 end
 '
 

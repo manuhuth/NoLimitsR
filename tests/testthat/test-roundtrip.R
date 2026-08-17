@@ -40,6 +40,13 @@ end
   pred <- nl$predict(res, jdf)
   expect_true("prediction" %in% names(nl_collect(pred)))
 
+  # get_random_effects returns a NamedTuple of tables; nl_collect unwraps the
+  # single field instead of stringifying it into one row.
+  redf <- nl_collect(nl$get_random_effects(res))
+  expect_equal(nrow(redf), 4L)
+  expect_true(is.numeric(redf$eta_1))
+  expect_equal(sort(as.character(redf$ID)), c("s1", "s2", "s3", "s4"))
+
   path <- tempfile(fileext = ".png")
   nl_plot("plot_fits", res, file = path)
   expect_gt(file.size(path), 0)
@@ -56,6 +63,13 @@ end
                "save_path")
   expect_error(nl_plot("plot_no_such_thing", res, file = "a.png"),
                "plot_no_such_thing")
+
+  # A Julia-side plotting failure must come back as a plain, catchable R error.
+  # Some of them (a Makie font error for a CJK subject ID, whose own showerror
+  # hits a Julia 1.12 world-age fault) used to corrupt the bridge and hang R
+  # forever; nl_plot routes through the session's nl_safe_call to prevent that.
+  expect_error(nl_plot("plot_fits", "not a fit result", file = "a.png"),
+               "MethodError")
 })
 
 test_that("data frame edge cases convert without corruption", {
@@ -110,6 +124,8 @@ test_that("jl_sym rejects non-scalar and non-character input", {
   skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
   expect_error(jl_sym(c("ID", "other")), "single string")
   expect_error(jl_sym(1), "single string")
+  expect_error(nl_model(c("a", "b")), "single string")
+  expect_error(nl_model(1), "single string")
 })
 
 test_that("session helpers are called by reference, not by module-qualified name", {
