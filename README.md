@@ -68,6 +68,11 @@ NoLimitsR::install_nolimits(env = "myproject")   # once, creates the environment
 nl_use_env("myproject")                          # before the first nolimits() call
 ```
 
+Pre-release versions can be tracked with `install_nolimits(rev = "main")`, which
+installs NoLimits.jl straight from that branch, tag or commit instead of the
+registry. A plain `install_nolimits()` returns the environment to registry
+releases. When Julia is already running, both take effect at the next R session.
+
 `nolimits_status()` is the first thing to run when something looks wrong. It
 reports whether a suitable Julia was found, the target and active environment, the
 Julia and NoLimits.jl versions, and the packages installed in the environment.
