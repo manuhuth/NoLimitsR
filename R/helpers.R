@@ -51,16 +51,19 @@ nl_model <- function(code) {
          length(code), ".", call. = FALSE)
   }
   code <- trimws(code)
-  if (!grepl("@Model", .strip_comments(code), fixed = TRUE)) {
+  if (!.has_model_block(code)) {
     code <- paste0("@Model begin\n", code, "\nend")
   }
   nl_eval(code)
 }
 
+# A real @Model block opens a line. Requiring that ignores both a comment and a
+# string literal mentioning "@Model" mid-line.
 # ponytail: a `#` inside a string literal also counts as a comment start here;
 # good enough to decide whether the source has a real @Model block.
-.strip_comments <- function(code) {
-  paste(sub("#.*$", "", strsplit(code, "\n", fixed = TRUE)[[1]]), collapse = "\n")
+.has_model_block <- function(code) {
+  lines <- sub("#.*$", "", strsplit(code, "\n", fixed = TRUE)[[1]])
+  any(grepl("^[[:space:]]*@Model\\b", lines))
 }
 
 #' R data.frame -> Julia DataFrames.DataFrame (required input for DataModel).
@@ -74,7 +77,10 @@ nl_data <- function(df) {
   }
   fac <- vapply(df, is.factor, logical(1))
   df[fac] <- lapply(df[fac], as.character)
-  .session_fun("nl_df")(df)
+  chr <- names(df)[vapply(df, is.character, logical(1))]
+  # An all-NA character column arrives untyped; name the string columns so Julia
+  # can restore their type (see nl_df in .SESSION_SETUP).
+  .session_fun("nl_df")(df, if (length(chr) == 0) character(1) else chr)
 }
 
 #' Julia table (e.g. a predict() result) -> R data.frame.
@@ -93,6 +99,11 @@ nl_string <- function(x) {
 #' Materialize a Julia value into plain R data structures (lists, vectors). For
 #' tables prefer nl_collect(), which returns a data.frame.
 nl_get <- function(x) {
+  # Small Julia values (a Vector{Float64} field, a scalar) are auto-converted by
+  # the bridge and reach R as plain data; juliaGet only knows Julia references.
+  if (!inherits(x, "JuliaProxy")) {
+    return(x)
+  }
   nolimits()
   JuliaConnectoR::juliaGet(x)
 }
@@ -112,6 +123,12 @@ jl_sym <- function(s) {
   if (!is.character(s) || length(s) != 1L) {
     stop("jl_sym() needs a single string, got ", class(s)[1], " of length ",
          length(s), ".", call. = FALSE)
+  }
+  # NA would cross the bridge as Julia `missing` and yield the symbol :missing;
+  # an empty name is a caller mistake in both ports.
+  if (is.na(s) || !nzchar(s)) {
+    stop("jl_sym() needs a non-empty string, got ",
+         if (is.na(s)) "NA" else "\"\"", ".", call. = FALSE)
   }
   nolimits()
   JuliaConnectoR::juliaCall("Symbol", s)

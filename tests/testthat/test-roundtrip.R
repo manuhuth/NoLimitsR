@@ -40,6 +40,14 @@ end
   pred <- nl$predict(res, jdf)
   expect_true("prediction" %in% names(nl_collect(pred)))
 
+  # A plain R named list works wherever NoLimits normalizes a NamedTuple option:
+  # the session module teaches _as_namedtuple about JuliaConnectoR's ElementList.
+  sim <- nl_collect(nl$simulate_data(
+    dm, theta_untransformed = list(A0 = 12, k = 0.4, omega = 0.3, sigma = 0.4)))
+  expect_equal(nrow(sim), 16L)
+  expect_error(nl$simulate_data(dm, theta_untransformed = list(12, k = 0.4)),
+               "name for every element")
+
   # get_random_effects returns a NamedTuple of tables; nl_collect unwraps the
   # single field instead of stringifying it into one row.
   redf <- nl_collect(nl$get_random_effects(res))
@@ -88,6 +96,16 @@ test_that("data frame edge cases convert without corruption", {
   expect_error(nl_data(data.frame(ID = character(0), time = numeric(0))),
                "at least one row")
 
+  # A string column whose only values are NA keeps its type whatever the row count;
+  # it used to come back numeric for a single row, which broke rbind() against the
+  # multi-row table.
+  for (n in 1:3) {
+    back <- nl_collect(nl_data(data.frame(x = seq_len(n),
+                                          y = factor(rep(NA, n), levels = c("a", "b")))))
+    expect_type(back$y, "character")
+    expect_true(all(is.na(back$y)))
+  }
+
   # Column names round-trip byte for byte.
   sdf <- data.frame(ID = c("s1", "s1"), time = c(0, 1), y = c(1, 2))
   names(sdf)[3] <- "y with space"
@@ -110,6 +128,11 @@ end
 ')
   typename <- JuliaConnectoR::juliaEval("x -> string(nameof(typeof(x)))")
   expect_equal(typename(bare), "Model")
+
+  # "@Model" inside a string literal is not a DSL block either: the body gets
+  # wrapped and the missing blocks are reported, instead of silently returning 2.
+  expect_error(nl_model('msg = "call @Model to build a model"\nx = 1 + 1'),
+               "@Model")
 })
 
 test_that("unknown names on the nl surface error informatively", {
@@ -124,6 +147,9 @@ test_that("jl_sym rejects non-scalar and non-character input", {
   skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
   expect_error(jl_sym(c("ID", "other")), "single string")
   expect_error(jl_sym(1), "single string")
+  # NA used to cross the bridge as `missing` and yield the symbol :missing.
+  expect_error(jl_sym(NA_character_), "non-empty string")
+  expect_error(jl_sym(""), "non-empty string")
   expect_error(nl_model(c("a", "b")), "single string")
   expect_error(nl_model(1), "single string")
 })
@@ -175,4 +201,23 @@ test_that("nl_string and nl_get avoid raw bridge calls", {
   expect_type(s, "character")
   expect_match(s, "abc")
   expect_true(1 %in% unlist(nl_get(nl_nt(a = 1))))
+  # Values the bridge already converted (a Vector{Float64} field, a scalar) are
+  # returned unchanged instead of hitting juliaGet's S4 dispatch error.
+  expect_identical(nl_get(c(1.5, 2.5)), c(1.5, 2.5))
+  expect_identical(nl_get("plain"), "plain")
+})
+
+test_that("nolimits() refuses an environment that has no NoLimits dependency", {
+  skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
+  # Needs its own Julia process: the guard runs at boot. `using NoLimits` succeeds
+  # from Julia's stacked default environment, which pins and isolates nothing.
+  script <- tempfile(fileext = ".R")
+  writeLines(c(
+    "library(NoLimitsR)",
+    sprintf('nl_use_env("%s")', file.path(tempdir(), "empty-julia-env")),
+    'cat(tryCatch({nolimits(); "NO ERROR"}, error = function(e) conditionMessage(e)))'
+  ), script)
+  out <- suppressWarnings(system2(file.path(R.home("bin"), "Rscript"), script,
+                                  stdout = TRUE, stderr = FALSE))
+  expect_match(paste(out, collapse = " "), "install_nolimits")
 })
