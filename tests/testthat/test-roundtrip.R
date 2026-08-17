@@ -43,6 +43,82 @@ end
   path <- tempfile(fileext = ".png")
   nl_plot("plot_fits", res, file = path)
   expect_gt(file.size(path), 0)
+
+  # A relative file= resolves against R's working directory, not Julia's.
+  wd <- file.path(tempdir(), "plotwd")
+  dir.create(file.path(wd, "sub"), recursive = TRUE, showWarnings = FALSE)
+  old <- setwd(wd)
+  on.exit(setwd(old), add = TRUE)
+  nl_plot("plot_fits", res, file = file.path("sub", "rel.png"))
+  expect_gt(file.size(file.path("sub", "rel.png")), 0)
+
+  expect_error(nl_plot("plot_fits", res, file = "a.png", save_path = "b.png"),
+               "save_path")
+  expect_error(nl_plot("plot_no_such_thing", res, file = "a.png"),
+               "plot_no_such_thing")
+})
+
+test_that("data frame edge cases convert without corruption", {
+  skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
+
+  # Factor labels, not the underlying integer codes.
+  fdf <- data.frame(ID = factor(c("s1", "s1", "s2", "s2")), time = c(0, 1, 0, 1),
+                    y = c(1, 2, 3, 4))
+  expect_equal(nl_collect(nl_data(fdf))$ID, c("s1", "s1", "s2", "s2"))
+
+  # A length-1 R column reaches Julia as a scalar; nl_df must still see one row.
+  one <- nl_collect(nl_data(data.frame(ID = "s1", time = 0, y = 1.0)))
+  expect_equal(nrow(one), 1L)
+  expect_equal(as.character(one$ID), "s1")
+
+  expect_error(nl_data(data.frame(ID = character(0), time = numeric(0))),
+               "at least one row")
+
+  # Column names round-trip byte for byte.
+  sdf <- data.frame(ID = c("s1", "s1"), time = c(0, 1), y = c(1, 2))
+  names(sdf)[3] <- "y with space"
+  expect_equal(names(nl_collect(nl_data(sdf))), c("ID", "time", "y with space"))
+})
+
+test_that("nl_model wraps a bare body even when a comment mentions @Model", {
+  skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
+  bare <- nl_model('
+# no @Model here, just a comment
+@fixedEffects begin
+    sigma = RealNumber(0.5, scale=:log)
+end
+@covariates begin
+    time = Covariate()
+end
+@formulas begin
+    y ~ Normal(time, sigma)
+end
+')
+  typename <- JuliaConnectoR::juliaEval("x -> string(nameof(typeof(x)))")
+  expect_equal(typename(bare), "Model")
+})
+
+test_that("unknown names on the nl surface error informatively", {
+  skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
+  nl <- nolimits()
+  expect_true(is.function(nl$fit_model))
+  expect_error(nl$totally_bogus_name_xyz, "totally_bogus_name_xyz")
+  expect_error(nl[["totally_bogus_name_xyz"]], "totally_bogus_name_xyz")
+})
+
+test_that("jl_sym rejects non-scalar and non-character input", {
+  skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
+  expect_error(jl_sym(c("ID", "other")), "single string")
+  expect_error(jl_sym(1), "single string")
+})
+
+test_that("session helpers are called by reference, not by module-qualified name", {
+  skip_if_not(JuliaConnectoR::juliaSetupOk(), "Julia not available")
+  # Julia 1.12 warns about world age whenever a call re-resolves
+  # `NoLimitsSession.<name>`; a reference proxy never does.
+  f <- NoLimitsR:::.session_fun("nl_df")
+  expect_true("JLREF" %in% names(attributes(f)))
+  expect_null(attr(f, "JLFUN"))
 })
 
 test_that("nl_eval evaluates in the session module", {

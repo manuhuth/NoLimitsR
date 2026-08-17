@@ -39,8 +39,7 @@ nl_detach <- function() {
 #' Note: JuliaConnectoR::juliaEval evaluates in Main instead and is NOT visible
 #' to model strings.
 nl_eval <- function(code) {
-  nolimits()
-  JuliaConnectoR::juliaCall("NoLimitsSession.nl_eval_string", code)
+  .session_fun("nl_eval_string")(code)
 }
 
 #' Build a NoLimits Model from @Model DSL source. The string may contain a Julia
@@ -48,23 +47,36 @@ nl_eval <- function(code) {
 #' block body without @Model is wrapped in @Model begin ... end.
 nl_model <- function(code) {
   code <- trimws(code)
-  if (!grepl("@Model", code, fixed = TRUE)) {
+  if (!grepl("@Model", .strip_comments(code), fixed = TRUE)) {
     code <- paste0("@Model begin\n", code, "\nend")
   }
   nl_eval(code)
 }
 
+# ponytail: a `#` inside a string literal also counts as a comment start here;
+# good enough to decide whether the source has a real @Model block.
+.strip_comments <- function(code) {
+  paste(sub("#.*$", "", strsplit(code, "\n", fixed = TRUE)[[1]]), collapse = "\n")
+}
+
 #' R data.frame -> Julia DataFrames.DataFrame (required input for DataModel).
+#' Factor columns are sent as their character labels; the bridge would otherwise
+#' ship the bare integer codes.
 nl_data <- function(df) {
-  nolimits()
-  JuliaConnectoR::juliaCall("NoLimitsSession.nl_df", df)
+  df <- as.data.frame(df, stringsAsFactors = FALSE)
+  if (nrow(df) == 0) {
+    stop("nl_data() requires at least one row; the R-to-Julia bridge cannot ",
+         "serialize zero-length columns.", call. = FALSE)
+  }
+  fac <- vapply(df, is.factor, logical(1))
+  df[fac] <- lapply(df[fac], as.character)
+  .session_fun("nl_df")(df)
 }
 
 #' Julia table (e.g. a predict() result) -> R data.frame.
 nl_collect <- function(x) {
-  nolimits()
-  cols <- JuliaConnectoR::juliaGet(JuliaConnectoR::juliaCall("NoLimitsSession.nl_table", x))
-  as.data.frame(cols, stringsAsFactors = FALSE)
+  cols <- JuliaConnectoR::juliaGet(.session_fun("nl_table")(x))
+  as.data.frame(cols, stringsAsFactors = FALSE, check.names = FALSE)
 }
 
 #' Render any Julia object (parameters, shrinkage, fit summaries) as a string,
@@ -86,12 +98,17 @@ nl_get <- function(x) {
 #' fit_model(..., theta_0_untransformed = nl_nt(k = 0.7)). Nests naturally:
 #' nl_nt(a = nl_nt(b = 1)).
 nl_nt <- function(...) {
-  nolimits()
-  JuliaConnectoR::juliaCall("NoLimitsSession.nl_nt", ...)
+  .session_fun("nl_nt")(...)
 }
 
 #' Julia Symbol from a string, for Symbol-typed arguments such as primary_id.
+#' Limited to strings shorter than 10000 bytes: JuliaConnectoR converts the
+#' returned Symbol back into an R symbol, and R caps name lengths there.
 jl_sym <- function(s) {
+  if (!is.character(s) || length(s) != 1L) {
+    stop("jl_sym() needs a single string, got ", class(s)[1], " of length ",
+         length(s), ".", call. = FALSE)
+  }
   nolimits()
   JuliaConnectoR::juliaCall("Symbol", s)
 }
@@ -100,15 +117,24 @@ jl_sym <- function(s) {
 #' draws it in the active graphics device when interactive. Returns the path
 #' invisibly. Loads CairoMakie on first use.
 nl_plot <- function(fname, ..., file = NULL) {
+  if ("save_path" %in% names(list(...))) {
+    stop("nl_plot() sets save_path itself; pass the destination as file = ",
+         "instead of save_path = (not both).", call. = FALSE)
+  }
   nl <- nolimits()
   if (is.null(.nl$makie)) {
     JuliaConnectoR::juliaEval("import CairoMakie")
     .nl$makie <- TRUE
   }
   path <- if (is.null(file)) tempfile(fileext = ".png") else file
-  # NoLimits requires the save_path directory to exist; a bare filename has an
-  # empty dirname, so hand Julia an absolute path.
-  path <- normalizePath(path, mustWork = FALSE)
+  # NoLimits requires the save_path directory to exist, and Julia runs as a
+  # subprocess whose working directory never follows R's, so hand it an absolute
+  # path. normalizePath() cannot do this: it returns a relative path unchanged
+  # when the target file does not exist yet, which is the normal case here.
+  path <- path.expand(path)
+  if (!grepl("^(/|[A-Za-z]:)", path)) {
+    path <- file.path(getwd(), path)
+  }
   do.call(nl[[fname]], c(list(...), list(save_path = path)))
   if (is.null(file) && interactive() && requireNamespace("png", quietly = TRUE)) {
     grid::grid.newpage()

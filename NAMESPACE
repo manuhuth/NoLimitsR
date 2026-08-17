@@ -1,3 +1,5 @@
+S3method("$",nolimits_api)
+S3method("[[",nolimits_api)
 export(install_nolimits)
 export(jl_sym)
 export(nl_attach)

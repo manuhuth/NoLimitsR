@@ -11,7 +11,16 @@ using NoLimits.Distributions
 using NoLimits.OrdinaryDiffEq
 using NoLimits.LinearAlgebra
 const DataFrames = NoLimits.DataFrames
-nl_df(tbl) = DataFrames.DataFrame(tbl)
+const Tables = DataFrames.Tables
+# JuliaConnectoR ships a length-1 R column as a scalar, which DataFrame(tbl)
+# then measures with length() (a 2-character string looks like 2 rows).
+nl_vec(v) = v isa AbstractVector ? v : [v]
+nl_df(tbl::DataFrames.DataFrame) = tbl
+function nl_df(tbl)
+    cols = Tables.columns(tbl)
+    DataFrames.DataFrame([string(n) => nl_vec(Tables.getcolumn(cols, n))
+                          for n in Tables.columnnames(cols)])
+end
 nl_names(x) = string.(Base.names(nl_df(x)))
 # Columns of exotic eltype (Symbol, enums) come back as R symbols, which
 # as.data.frame then tries to evaluate; stringify anything not natively atomic.
@@ -73,8 +82,40 @@ nolimits <- function() {
          ". Run NoLimitsR::install_nolimits().")
   }
   JuliaConnectoR::juliaEval(.SESSION_SETUP)
-  .nl$api <- JuliaConnectoR::juliaImport("NoLimits")
+  api <- JuliaConnectoR::juliaImport("NoLimits")
+  class(api) <- c("nolimits_api", class(api))
+  .nl$api <- api
   .nl$api
+}
+
+#' @export
+`$.nolimits_api` <- function(x, name) .nl_export(x, name)
+
+#' @export
+`[[.nolimits_api` <- function(x, name) .nl_export(x, name)
+
+# Unknown names must not come back as NULL: the caller then hits R's generic
+# "attempt to apply non-function" far from the actual typo.
+.nl_export <- function(x, name) {
+  v <- get0(name, envir = x, inherits = FALSE)
+  if (is.null(v)) {
+    stop("NoLimits.jl has no export '", name, "'", call. = FALSE)
+  }
+  v
+}
+
+# Julia 1.12 warns when a call re-resolves `NoLimitsSession.<name>` by name after
+# the session has evaluated new code. An anonymous-function proxy holds a Julia
+# reference instead, so the binding is never looked up again.
+.session_fun <- function(name) {
+  key <- paste0(".fun_", name)
+  if (is.null(.nl[[key]])) {
+    nolimits()
+    .nl[[key]] <- JuliaConnectoR::juliaEval(
+      sprintf("(a...; k...) -> NoLimitsSession.%s(a...; k...)", name)
+    )
+  }
+  .nl[[key]]
 }
 
 #' Choose the Julia environment (shared name or directory path) used at boot.
@@ -117,8 +158,18 @@ nolimits_status <- function() {
   st$julia_version <- JuliaConnectoR::juliaEval("string(VERSION)")
   st$project <- JuliaConnectoR::juliaEval("Base.active_project()")
   st$nolimits_version <- JuliaConnectoR::juliaEval("string(pkgversion(NoLimits))")
-  st$installed_packages <- JuliaConnectoR::juliaEval(
-    "join(sort!(collect(keys(Pkg.project().dependencies))), \", \")"
+  deps <- JuliaConnectoR::juliaEval(
+    "sort!(collect(keys(Pkg.project().dependencies)))"
   )
+  st$installed_packages <- paste(deps, collapse = ", ")
+  # `using NoLimits` also succeeds from Julia's stacked default environment, which
+  # would otherwise report a healthy version for an environment that has none.
+  if (!("NoLimits" %in% deps)) {
+    st$error <- paste0(
+      "NoLimits.jl is not a dependency of the active project (", st$project,
+      "); it loaded from Julia's default environment instead. Run ",
+      'NoLimitsR::install_nolimits(env = "', st$target_env, '").'
+    )
+  }
   st
 }
