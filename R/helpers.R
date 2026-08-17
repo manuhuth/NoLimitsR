@@ -47,6 +47,9 @@ nl_plot <- function(fname, ..., file = NULL) {
     .nl$makie <- TRUE
   }
   path <- if (is.null(file)) tempfile(fileext = ".png") else file
+  # NoLimits requires the save_path directory to exist; a bare filename has an
+  # empty dirname, so hand Julia an absolute path.
+  path <- normalizePath(path, mustWork = FALSE)
   do.call(nl[[fname]], c(list(...), list(save_path = path)))
   if (is.null(file) && interactive() && requireNamespace("png", quietly = TRUE)) {
     grid::grid.newpage()
