@@ -22,8 +22,8 @@ remotes::install_github("manuhuth/NoLimitsR")
 NoLimitsR::install_nolimits()
 ```
 
-`install_nolimits()` adds NoLimits.jl and CairoMakie to a shared Julia environment
-named `NoLimitsR`. It downloads and precompiles the Julia packages, which takes
+`install_nolimits()` adds NoLimits.jl (>= 0.2.5, from the registry) and CairoMakie
+to a shared Julia environment named `NoLimitsR`. It downloads and precompiles the Julia packages, which takes
 several minutes on the first run. Optional integrations go through the same call:
 
 ```r

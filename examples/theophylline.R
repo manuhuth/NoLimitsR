@@ -9,8 +9,7 @@
 # Run from the repository root:
 #   Rscript examples/theophylline.R
 #
-# Requires NoLimits.jl >= 0.2.5 (until released: NoLimitsR::install_nolimits(rev
-# = "main")).
+# Requires NoLimits.jl >= 0.2.5, which install_nolimits() takes from the registry.
 
 library(NoLimitsR)
 
