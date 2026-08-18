@@ -3,3 +3,6 @@
 *.Rcheck/
 .DS_Store
 *.png
+.RData
+.Rapp.history
+*.tar.gz
