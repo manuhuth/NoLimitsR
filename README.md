@@ -49,17 +49,17 @@ fully supported and autocompletes all functions in RStudio.
 
 ## NamedTuple options
 
-Options that are NamedTuples in Julia are built with `nl_nt()`:
+Options that are NamedTuples in Julia are written as a named `list()`:
 
 ```r
-res <- nl$fit_model(dm, nl$Laplace(optim_kwargs = nl_nt(show_trace = TRUE)),
-                    theta_0_untransformed = nl_nt(k = 0.7))
+res <- nl$fit_model(dm, nl$Laplace(optim_kwargs = list(show_trace = TRUE)),
+                    theta_0_untransformed = list(k = 0.7))
 ```
 
-`nl_nt` nests naturally, e.g. `nl_nt(a = nl_nt(b = 1))`. A plain named `list()`
-works too, including nested ones, and an element without a name is rejected with a
-message pointing at `nl_nt()`. A fully unnamed `list(1, 2)` reaches Julia as an
-ordinary vector, so it is not detected as a mistyped option.
+Nested lists work the same way, e.g. `list(a = list(b = 1))`, and an element without
+a name is rejected with a message. A fully unnamed `list(1, 2)` reaches Julia as an
+ordinary vector, so it is not detected as a mistyped option. `nl_nt()` is the
+equivalent explicit constructor if you prefer to spell the NamedTuple out.
 
 ## Environments
 
@@ -134,7 +134,7 @@ df <- data.frame(
 )
 
 jdf <- nl_data(df)
-dm <- nl$DataModel(model, jdf, primary_id = jl_sym("ID"), time_col = jl_sym("time"))
+dm <- nl$DataModel(model, jdf, primary_id = "ID", time_col = "time")
 res <- nl$fit_model(dm, nl$Laplace())
 
 nl$get_objective(res)
@@ -185,10 +185,10 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   nothing on top of it. Names ending in `!` need backticks, as in ``nl$`foo!` ``.
   Julia macros are not part of the dynamic surface, which is what `nl_model` and
   `nl_eval` are for.
-- Symbols: use `jl_sym("ID")` for Symbol-typed arguments such as `primary_id` and
-  `time_col`. It takes a single non-empty string shorter than 10000 bytes, which is where
-  R's own limit on symbol names sits; `NA` and `""` are rejected. All other keyword arguments pass through as normal R
-  named arguments.
+- Symbols: pass a plain string for Symbol-typed arguments, as in `primary_id = "ID"`
+  and `time_col = "time"`; the wrapper converts it. `jl_sym("ID")` remains available for
+  edge cases, such as building a Symbol value to store rather than to pass. All other
+  keyword arguments pass through as normal R named arguments.
 - Getting data in and out: `nl_data(df)` turns an R data.frame into a Julia
   `DataFrame`, which is what `DataModel` expects, and `nl_collect(x)` turns a Julia
   table such as a `predict` result back into an R data.frame. Scalars convert
@@ -212,8 +212,9 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   - A column whose values are all `NA` carries no type across the bridge. `nl_data()`
     names the character and factor columns so those come back as character `NA`
     whatever the row count; an all-`NA` column of any other type comes back numeric.
-- NamedTuple options: `nl_nt()` builds the NamedTuple that options such as
-  `optim_kwargs` expect. Options that NoLimits keys by value rather than by name, such
+- NamedTuple options: a named `list()` becomes the NamedTuple that options such as
+  `optim_kwargs` expect, and `nl_nt()` is the explicit constructor for the same thing.
+  Options that NoLimits keys by value rather than by name, such
   as `constants_re`, are Julia dictionaries instead and are built with `nl_eval()`.
 - Model strings: a `@Model` block is recognized when `@Model` opens a line, so a
   mention of it inside a comment or a string literal does not stop the body from being
