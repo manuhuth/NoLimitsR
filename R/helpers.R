@@ -136,7 +136,7 @@ jl_sym <- function(s) {
 
 #' Call any NoLimits plot_* function by name; saves to `file` (or a temp PNG) and
 #' draws it in the active graphics device when interactive. Returns the path
-#' invisibly. Loads CairoMakie on first use.
+#' invisibly. Loads CairoMakie and AlgebraOfGraphics on first use.
 nl_plot <- function(fname, ..., file = NULL) {
   if ("save_path" %in% names(list(...))) {
     stop("nl_plot() sets save_path itself; pass the destination as file = ",
@@ -144,7 +144,7 @@ nl_plot <- function(fname, ..., file = NULL) {
   }
   nl <- nolimits()
   if (is.null(.nl$makie)) {
-    JuliaConnectoR::juliaEval("import CairoMakie")
+    JuliaConnectoR::juliaEval("import CairoMakie, AlgebraOfGraphics")
     .nl$makie <- TRUE
   }
   path <- if (is.null(file)) tempfile(fileext = ".png") else file
@@ -160,8 +160,8 @@ nl_plot <- function(fname, ..., file = NULL) {
   # Routed through the session's nl_safe_call: a raw Julia plotting error can hang
   # the bridge while it is being reported (see nl_safe_call).
   do.call(.session_fun("nl_safe_call"), c(list(fname), list(...), list(save_path = path)))
-  # Makie leaves ~30 MB of figure memory per plot behind; a collect here recovers
-  # most of it (measured ~5 MB/plot residual) and costs little next to rendering.
+  # Makie leaves ~30-50 MB of figure memory per plot behind; a collect here cuts it
+  # to ~20 MB/plot (measured) and costs little next to rendering.
   nl_eval("GC.gc(); nothing")
   if (is.null(file) && interactive() && requireNamespace("png", quietly = TRUE)) {
     grid::grid.newpage()

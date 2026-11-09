@@ -1,6 +1,6 @@
 Package: NoLimitsR
 Title: R Interface to the NoLimits.jl Nonlinear Mixed-Effects Package
-Version: 0.1.0
+Version: 0.2.0
 Authors@R: person("Manuel", "Huth", email = "manuel.huth@uni-bonn.de",
     role = c("aut", "cre"))
 Description: Thin wrapper around the Julia package NoLimits.jl for nonlinear
