@@ -2,7 +2,7 @@
 # library() time (R CMD check on Julia-less machines, headless servers).
 .nl <- new.env(parent = emptyenv())
 
-.MIN_NOLIMITS <- "0.2.5"
+.MIN_NOLIMITS <- "0.3.0"
 
 .SESSION_SETUP <- '
 module NoLimitsSession

@@ -136,7 +136,7 @@ jl_sym <- function(s) {
 
 #' Call any NoLimits plot_* function by name; saves to `file` (or a temp PNG) and
 #' draws it in the active graphics device when interactive. Returns the path
-#' invisibly. Loads CairoMakie on first use.
+#' invisibly. Loads CairoMakie and AlgebraOfGraphics on first use.
 nl_plot <- function(fname, ..., file = NULL) {
   if ("save_path" %in% names(list(...))) {
     stop("nl_plot() sets save_path itself; pass the destination as file = ",
@@ -144,7 +144,7 @@ nl_plot <- function(fname, ..., file = NULL) {
   }
   nl <- nolimits()
   if (is.null(.nl$makie)) {
-    JuliaConnectoR::juliaEval("import CairoMakie")
+    JuliaConnectoR::juliaEval("import CairoMakie, AlgebraOfGraphics")
     .nl$makie <- TRUE
   }
   path <- if (is.null(file)) tempfile(fileext = ".png") else file
