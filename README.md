@@ -242,10 +242,10 @@ The same mechanism covers Lux, CSV, JLD2, Copulas, and Turing.
   function and forwards `save_path`. Without `file` it writes a temporary PNG and draws
   it in the active graphics device in interactive sessions. CairoMakie and AlgebraOfGraphics are
   loaded on the first plot call only.
-- Plot memory: Makie leaves figure memory behind on every plot call, about 30 MB per
-  plot in the Julia process. `nl_plot()` runs a Julia garbage collection after saving,
-  which recovers most of it (about 5 MB per plot remains in a measured 10-plot loop).
-  A very long plotting loop still grows; restart Julia between batches if it matters.
+- Plot memory: Makie leaves figure memory behind on every plot call, about 30 to 50 MB
+  per plot in the Julia process. `nl_plot()` runs a Julia garbage collection after
+  saving, which reduces this to about 20 MB per plot in a measured 10-plot loop. A long
+  plotting loop therefore still grows; restart Julia between batches if it matters.
 - Object lifetime: Model, DataModel, and fit-result objects are live references into
   the Julia session and do not survive the process. `save.image()`, a restored
   `.RData`, and `saveRDS()`/`readRDS()` all store the reference rather than the data:

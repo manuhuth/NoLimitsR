@@ -160,8 +160,8 @@ nl_plot <- function(fname, ..., file = NULL) {
   # Routed through the session's nl_safe_call: a raw Julia plotting error can hang
   # the bridge while it is being reported (see nl_safe_call).
   do.call(.session_fun("nl_safe_call"), c(list(fname), list(...), list(save_path = path)))
-  # Makie leaves ~30 MB of figure memory per plot behind; a collect here recovers
-  # most of it (measured ~5 MB/plot residual) and costs little next to rendering.
+  # Makie leaves ~30-50 MB of figure memory per plot behind; a collect here cuts it
+  # to ~20 MB/plot (measured) and costs little next to rendering.
   nl_eval("GC.gc(); nothing")
   if (is.null(file) && interactive() && requireNamespace("png", quietly = TRUE)) {
     grid::grid.newpage()
